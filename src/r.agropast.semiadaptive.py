@@ -2,26 +2,34 @@
 #
 ############################################################################
 #
-# MODULE:           r.agropast.semiadaptive.tenure.py
-# AUTHOR(S):        Isaac Ullah, University of Pittsburgh, Arizona State University
-# PURPOSE:        Simulates agricultural and pastoral landuse and tracks yields and environmental
-#                          impacts. Farming and grazing strategies and yield goals are predetermined by the
-#                          researcher, and do not change (adapt) during the simulation. However, catchment sizes
-#                          can be adapted over time to meet these goals. This version implments a land tenuring alogrithm.
-#                          Requires r.landscape.evol.
-# ACKNOWLEDGEMENTS:    National Science Foundation Grant #BCS0410269, Center for Comparative Archaeology at
-#                          the University of Pittsburgh, Center for Social Dynamics and Complexity at Arizona
-#                          State University
-# COPYRIGHT:        (C) 2014 by Isaac Ullah, University of Pittsburgh
-#            This program is free software under the GNU General Public
-#            License (>=v2). Read the file COPYING that comes with GRASS
-#            for details.
+# MODULE:               r.agropast.semiadaptive.7.0.5
+#
+# AUTHOR(S):            Isaac Ullah, San Diego State University
+#
+# PURPOSE:              Simulates agricultural and pastoral landuse and tracks 
+#                       yields and environmental impacts. Farming and grazing
+#                       strategies and yield goals are predetermined by the 
+#                       researcher, and do not change (adapt) during the 
+#                       simulation. However, catchment sizes can be adapted 
+#                       over time to meet these goals. This version implments 
+#                       a land tenuring alogrithm. Requires r.landscape.evol.
+#
+# ACKNOWLEDGEMENTS:     National Science Foundation Grant #BCS0410269, Center 
+#                       for Comparative Archaeology at the University of 
+#                       Pittsburgh, Center for Social Dynamics and Complexity 
+#                       at Arizona State University, San Diego State University
+#
+# COPYRIGHT:            (C) 2016 by Isaac Ullah, San Diego State University
+#
+#                   This program is free software under the GNU General Public
+#                   License (>=v2). Read the file COPYING that comes with GRASS
+#                   for details.
 #
 #############################################################################
 
 
 #%Module
-#%  description: Simulates agricultural and pastoral landuse and tracks yields and environmental impacts. Basic farming and grazing strategies and yield goals are predetermined by the researcher, and do not change (adapt) during the simulation. However, catchment sizes can be adapted over time to meet these goals. This version implments a land tenuring alogrithm. Requires r.landscape.evol. Note that some stats files will be written to current mapset, and will be appended to if you run the simulation again with the same prefix.
+#%  description: Simulates agricultural and pastoral landuse and tracks yields and environmental impacts. Basic farming and grazing strategies and yield goals are predetermined by the researcher, and do not change (adapt) during the simulation, but it is possible for population to change based on returns. This version implments a land tenuring alogrithm. Requires r.landscape.evol. Note that some stats files will be written to current mapset, and will be appended to if you run the simulation again with the same prefix.
 #%END
 
 ##################################
@@ -31,7 +39,7 @@
 #% key: years
 #% type: integer
 #% description: Number of iterations ("years") to run
-#% answer: 500
+#% answer: 200
 #% required: yes
 #% guisection: Simulation Control
 #%END
@@ -39,7 +47,7 @@
 #% key: prfx
 #% type: string
 #% description: Prefix for all output maps
-#% answer: p30f10sim
+#% answer: sim
 #% required: yes
 #% guisection: Simulation Control
 #%END
@@ -50,8 +58,29 @@
 #%option
 #% key: numpeople
 #% type: double
-#% description: Number of people in the village(s) (stays constant throughout the simulation)
-#% answer: 30
+#% description: Number of people in the village(s) (starting population size with flag -p, otherwise stays constant throughout the simulation)
+#% answer: 120
+#% guisection: Agent Properties
+#%END
+#%option
+#% key: birthrate
+#% type: double
+#% description: Per-capita human fecundity (only active with flag -p)
+#% answer: 0.054
+#% guisection: Agent Properties
+#%END
+#%option
+#% key: deathrate
+#% type: double
+#% description: Per-capita human mortality hazard (only active with flag -p)
+#% answer: 0.04
+#% guisection: Agent Properties
+#%END
+#%option
+#% key: starvthresh
+#% type: double
+#% description: Starvation threshold. If returns are below this percentage of the normal subsistence needs, people bcome "resource-starved." No births will occur, but deaths will still happen. (only active with flag -p)
+#% answer: 0.6
 #% guisection: Agent Properties
 #%END
 #%option
@@ -104,6 +133,11 @@
 #% description: Map of movement costs from the center of the agricultural/grazing catchments (from r.walk or r.cost).
 #% guisection: Agent Properties
 #%END
+#%flag
+#% key: p
+#% description: -p Allow the population to vary over time, according to subsistence returns
+#% guisection: Agent Properties
+#%end
 
 
 ##################################
@@ -164,34 +198,32 @@
 #% key: maxwheat
 #% type: double
 #% description: Maximum amount of wheat that can be grown (kg/ha)
-#% answer: 3500
+#% answer: 1750
 #% guisection: Farming
 #%END
 #%option
 #% key: maxbarley
 #% type: double
 #% description: Maximum amount of barley that can be grown (kg/ha)
-#% answer: 2500
+#% answer: 1250
+#% guisection: Farming
+#%END
+#%option
+#% key: tenuretype
+#% type: string
+#% description: Choose the land tenuring strategy: "None" (Fields are chosen at random each year), "Satisficing" (First year's fields are chosen at random. Fields are tenured, but some may be randomly dropped or added to meet the minimum need), "Maximizing" (Same as "satisficing", but tenured fields are only dropped if production falls below the threshold defined by "tenuredrop," not according to minimum need.)
+#% answer: Maximize
+#% options: None,Maximize,Satisfice
 #% guisection: Farming
 #%END
 #%option
 #% key: tenuredrop
 #% type: double
-#% description: Threshold for dropping land out of Tenure (with flag -M). If the value is positive it is interpreted as a percentage below the yearly average yield of all farm cells. If the value is negative, it is interpreted as a percentage of the maximum yield of all farm cells. Value will always be interpreted as a proportion between 0 and 1.
-#% answer: 0.0
-#% options: -1.0-1.0
+#% description: Threshold for dropping land out of tenure (with tenuretype as "Maximize"). If the value is 0, fields that yield less than the mean of all fields are dropped. If the value is greater than 0, then fields that are lower than that percentage of the maximum yield of all fields will be dropped.
+#% answer: 0.1
+#% options: 0.0-1.0
 #% guisection: Farming
 #%END
-#%flag
-#% key: i
-#% description: -i Implement Land Tenure with a satisficing strategy (land is never dropped, only added if needed)
-#% guisection: Farming
-#%end
-#%flag
-#% key: m
-#% description: -m Implement Land Tenure with a maximizing strategy (land is dropped if below the threshold defined by "tenuredrop")
-#% guisection: Farming
-#%end
 
 ##################################
 #Grazing Options
@@ -235,7 +267,7 @@
 #% key: manurerate
 #% type: double
 #% description: Base rate that animal dung contributes to fertility increase on a grazed patch in units of percentage of maximum fertility regained per increment of grazing impact. Actual fertility regain values are thus calculated as "manure_rate x grazing_impact", so be aware that this variable interacts with the grazing impact settings you have chosen.
-#% answer: 0.2
+#% answer: 0.03
 #% options: 0.0-100.0
 #% guisection: Grazing
 #%END
@@ -244,7 +276,7 @@
 #% type: string
 #% gisprompt: string
 #% description: Path to foddering rules file for calculation of fodder gained by grazing
-#% answer: /home/mdlpd/Dropbox/Scripts_Working_Dir/rules/fodder_rules.txt
+#% answer: /home/iullah/Dropbox/Scripts_Working_Dir/rules/fodder_rules.txt
 #% guisection: Grazing
 #%END
 #%flag
@@ -304,7 +336,7 @@
 #% type: string
 #% gisprompt: string
 #% description: Path to reclass rules file for landcover map
-#% answer: /home/mdlpd/Dropbox/Scripts_Working_Dir/rules/luse_reclass_rules.txt
+#% answer: /home/iullah/Dropbox/Scripts_Working_Dir/rules/luse_reclass_rules.txt
 #% guisection: Landcover Dynamics
 #%END
 #%option
@@ -312,7 +344,7 @@
 #% type: string
 #% gisprompt: string
 #% description: Path to recode rules file for c-factor map
-#% answer: /home/mdlpd/Dropbox/Scripts_Working_Dir/rules/cfactor_recode_rules.txt
+#% answer: /home/iullah/Dropbox/Scripts_Working_Dir/rules/cfactor_recode_rules.txt
 #% guisection: Landcover Dynamics
 #%END
 #%flag
@@ -495,6 +527,34 @@ import random
 import numpy
 import grass.script as grass
 
+#new random-poisson babymaker
+def babymaker(p, n): #p is the per capita birth rate, n is the population size
+    babys = (numpy.random.poisson(p*100)/100.)*n
+    return(int(babys))
+
+# old random-normal babymaker
+#def babymaker(p, n): #p is the per capita birth rate, n is the population size
+#    babys = 0
+#    for m in range(int(n)):
+#        x = numpy.random.random()
+#        if x < float(p):
+#            babys = babys + 1
+#    return(babys)
+
+#new random-poisson deathdealer
+def deathdealer(p, n): #p is the per capita death rate, n is the population size
+    deaths = (numpy.random.poisson(p*100)/100.)*n
+    return(int(deaths))
+
+#old random-normal deathdealer
+#def deathdealer(p, n): #p is the per capita death rate, n is the population size
+#    deaths = 0
+#    for m in range(int(n)):
+#        x = numpy.random.random()
+#        if x < float(p):
+#            deaths = deaths + 1
+#    return(deaths)
+
 #main block of code starts here
 def main():
     grass.message("Setting up Simulation........")
@@ -520,10 +580,14 @@ def main():
     maxwheat = options['maxwheat']
     maxbarley = options['maxbarley']
     mingraze = options['mingraze']
+    tenuretype = options['tenuretype']
     tenuredrop = options['tenuredrop']
     costsurf = options['costsurf']
     agmix = options['agmix']
     numpeople = float(options['numpeople'])
+    birthrate = float(options['birthrate'])
+    deathrate = float(options['birthrate'])
+    starvthresh = float(options['starvthresh'])
     agentmem = int(options['agentmem'])
     animals = float(options['animals'])
     agratio = 1 - float(options['a_p_ratio'])
@@ -632,10 +696,7 @@ def main():
     pid = os.getpid()
     #we need to separate out flags used by this script, and those meant to be sent to r.landscape.evol. We will do this by popping them out of the default "flags" dictionary, and making a new dictionary called "use_flags"
     use_flags = {}
-    use_flags.update({'g': flags.pop('g'), 'f': flags.pop('f'), 'c': flags.pop('c'), 'i': flags.pop('i'), 'm': flags.pop('m')})
-    #check the two tenure flags, and throw a fatal error if both are set.
-    if use_flags['i'] is True and use_flags['m'] is True:
-        grass.fatal("You have set both the i and the m flags, and this is not allowed. Please uncheck one and try again.")
+    use_flags.update({'g': flags.pop('g'), 'f': flags.pop('f'), 'c': flags.pop('c'), 'p': flags.pop('p')})
     #now assemble the flag string for r.landscape.evol'
     levol_flags = []
     for flag in flags:
@@ -690,10 +751,16 @@ def main():
     grazingmemory = []
     grazeyieldmemory = []
     grass.message('Simulation will run for %s iterations.\n\n............................STARTING SIMULATION...............................' % years)
+    # Before we get going on the loop, write out some basic information about the run. These can be used to remeber what the settings were for this particular run, as well as to provide some interpretation for the other stats files that will be made.
+    f = open(statsdir + os.sep + prfx + '_run_info.txt', 'a')
+    f.write("Variables used in the model:\ncell resolution (grazing patch size),%s\nagcatch,%s\nnsfieldsize,%s\newfieldsize,%s\ngrazecatch,%s\ngrazespatial,%s\ngrazepatchy,%s\nmaxgrazeimpact,%s\nmanurerate,%s\ninlcov,%s\nyears,%s\nfarmval,%s\nmaxfert,%s\nmaxwheat,%s\nmaxbarley,%s\nagmix,%s\nagentmem,%s\nnumpeople,%s\nanimals,%s\ncalculated agricultural ratio,%s\ncalculated pastoral ratio,%s\ncalculated cereal required per person,%s\ncalculated fodder required per animal,%s\ncalculated total cereal required,%s\ncalculated total number of animals required,%s\ncalculated total fodder required,%s\n\nFarming stats in Kg wheat and/or barley seeds per farmplot.\nGrazing stats in Kg of digestable matter per grazing plot. Note that this may also include stubble grazing if enabled." % (region['nsres'],agcatch,nsfieldsize,ewfieldsize,grazecatch,grazespatial,grazepatchy,maxgrazeimpact,manurerate,inlcov,years,farmval,maxfert,maxwheat,maxbarley,agmix,agentmem,numpeople,animals,agratio,pratio,indcerreq,fodder_anim,indfodreq,cerealreq,fodderreq)) 
+    f.close()
     #Set up loop
     for year in range(int(years)):
         now = str(year + 1).zfill(digits)
         then = str(year).zfill(digits)
+        if numpeople == 0:
+            grass.fatal("Everybody is dead. \nSimulation stopped at year %s." % then)
         #grab the current climate vars from the lists
         rain = rain2[year]
         r = R2[year]
@@ -740,8 +807,8 @@ def main():
         grass.message("Figuring out the farming plan for this year...")
         #gather some stats from yields maps in order to make an estimate of number of farm plots...
         cerealstats2 = grass.parse_command('r.univar', flags = 'ge', map = tempcerealreturn)
-        #"Fuzz up" the agent's memory of past yields and shortfalls. We do this by padding the actual values of these things to a randomly generated percentage that is drawn from a gaussian probability distribution with mu of the mean value and sigma of 0.0333. This means that the absolute max/min pad can only be up to +- %10 of the mean value (eg. at the 3-sigma level of a gaussian distribution with sigma of 0.0333), and that pad values closer to 0% will be more likely than pad values close to +- 10%. This more closely models how good people are at "educated guesses" of central tendencies (i.e., it's how people "guesstimate" the "average" value). This also ensures some variation from year to year, regardless of the "optimum" solution.
-        if len(farmyieldmemory) is 0: #if it's the first year, then just use the fuzzed average potential yield from all cells in agcatch, and make the padded amount 1
+        # Grab the agent's current memory of farming yields to see what they think they need to do this year
+        if len(farmyieldmemory) is 0:
             fuzzyyieldmemory = random.gauss(float(cerealstats2["mean"]), (float(cerealstats2['mean']) * 0.0333))
             fuzzydeficitmemory = -1
         else:
@@ -750,8 +817,8 @@ def main():
             else:
                 slicer = agentmem
             grass.debug("slicer: %s" % slicer)
-            fuzzyyieldmemory = random.gauss(numpy.mean(farmyieldmemory[slicer:]), (numpy.mean(farmyieldmemory[slicer:]) * 0.0333))
-            fuzzydeficitmemory = random.gauss(numpy.mean(farmingmemory[slicer:]), (numpy.mean(farmingmemory[slicer:]) * 0.0333))
+            fuzzyyieldmemory = numpy.mean(farmyieldmemory[slicer:])
+            fuzzydeficitmemory = numpy.mean(farmingmemory[slicer:])
         #Figure out how many fields the agent thinks it needs based on current average yield
         numfields = int(round(float(cerealreq) / fuzzyyieldmemory))
         grass.debug("total fields should be %s" % numfields)
@@ -768,53 +835,61 @@ def main():
             numfields = maxfields
         grass.debug("did numfields hit the max and be curtailed? %s" % numfields)
         #check for tenure, and do the appropriate type of tenure if asked
-        if use_flags['m'] is True:
+        if tenuretype == "Maximize":
             grass.message("Land Tenure is ON, with MAXIMIZING strategy")
             #check for first year, and zero out tenure if so
             if (year + 1) == 1:
+                tenuredfields = "%s_Year_%s_Tenured_Fields_Map" % (prfx, now)
                 grass.run_command('r.random', quiet = 'True', input = agcatch, npoints = numfields, raster = tempfields)
-                grass.message('First year, so all farm fields randomly assigned')
-                tenuredcells = 0
+                grass.run_command('g.copy', quiet = True, raster = "%s,%s" % (tempfields,tenuredfields))
+                grass.message('First year, so %s fields randomly assigned' % numfields)
+                tenuredcells = numfields
                 droppedcells = 0
                 newcells = 0
             else:
                 #make some map names
                 oldfields = "%s_Year_%s_Farming_Impacts_Map" % (prfx, then)
+                oldtenure = "%s_Year_%s_Tenured_Fields_Map" % (prfx, then)
                 tenuredfields = "%s_Year_%s_Tenured_Fields_Map" % (prfx, now)
+                tempcomparefields = "%stemporary_Old_Fields_yield_map" % pid
                 tempagcatch = "%stemporary_agricultural_catchment_map" % pid
                 grass.message('Performing yearly land tenure evaluation')
-                #grab stats from old fields
-                oldfarmstats = grass.parse_command('r.univar', flags = 'ge', map = oldfields)
-                #check the comparison metric and drop underperforming fields compared to average yield...
-                if tenuredrop >= 0:
-                    grass.mapcalc("${tenuredfields}=if(isnull(${oldfields}), null(), if(${tempcerealreturn} >= (${meanyield}*${tenuredrop}), 1, null()))", quiet = "True", tenuredfields=tenuredfields, oldfields = oldfields, tempcerealreturn = tempcerealreturn, meanyield = oldfarmstats['mean'], tenuredrop = tenuredrop)
-                else: #or compared to the maximum yeild.
-                    tenuredrop = tenuredrop * -1
-                    grass.mapcalc("${tenuredfields}=if(isnull(${oldfields}), null(), if(${tempcerealreturn} >= (${maxyield}*${tenuredrop}), 1, null()))", quiet = "True", tenuredfields=tenuredfields, oldfields = oldfields, tempcerealreturn = tempcerealreturn, maxyield = oldfarmstats['max'], tenuredrop = tenuredrop)
-                #temporarily update the agricultural catchment by withholding tenured cells. All other cells in the catchment will be fair game to be chosen for the new fields.
-                grass.mapcalc("${tempagcatch}=if(isnull(${agcatch}), null(), if(isnull(${tenuredfields}), ${agcatch}, null() ))", quiet = "True", tempagcatch = tempagcatch, agcatch = agcatch, tenuredfields = tenuredfields)
-                #pull stats out to see what we did (how many old fields kept, how many dropped, and how many new ones we need this year
-                tenuredstats = grass.parse_command('r.univar', flags = 'ge', map = tenuredfields)
-                tenuredcells = int(float(tenuredstats['cells']) - float(tenuredstats['null_cells']))
-                droppedcells = int(float(oldfarmstats['cells']) - float(oldfarmstats['null_cells'])) - tenuredcells
-                if numfields-tenuredcells <= 0:
-                    newcells = 0
+                #make a map of the current potential yields from the old fields
+                grass.mapcalc("${tempcomparefields}=if(isnull(${oldfields}), null(), ${tempcerealreturn} )", quiet = "True", tempcomparefields = tempcomparefields, oldfields = oldfields, tempcerealreturn = tempcerealreturn)
+                #grab stats from the old fields
+                oldfieldstats = grass.parse_command('r.univar', flags = 'ge', map = tempcomparefields)
+                #temporarily update the agricultural catchment by withholding last year's fields. All other cells in the catchment will be fair game to be chosen for the new fields.
+                grass.mapcalc("${tempagcatch}=if(isnull(${agcatch}), null(), if(isnull(${oldfields}), ${agcatch}, null() ))", quiet = "True", tempagcatch = tempagcatch, agcatch = agcatch, oldfields = oldfields)
+                newcells = numfields-tenuredcells #find out the difference between what we have and what we need
+                if newcells <= 0: #negative number, so we drop any underperforming fields)
+                    #check the comparison metric and drop underperforming fields compared to average yield...
+                    if tenuredrop == 0: #drop threshold is 0, so compare to mean yield of all fields
+                        grass.mapcalc("${tenuredfields}=if(${tempcomparefields} < (${meanyield}), null(), 1)", quiet = "True", tenuredfields=tenuredfields, tempcomparefields = tempcomparefields, meanyield = oldfieldstats['mean'])
+                    else: # drop threshold is above zero, so use it to compare to the maximum yeild.
+                        grass.mapcalc("${tenuredfields}=if(${tempcomparefields} < ${maxyield}-(${maxyield}*${tenuredrop}), null(), 1)", quiet = "True", tenuredfields=tenuredfields, tempcomparefields = tempcomparefields, maxyield = oldfieldstats['max'], tenuredrop = tenuredrop)
+                    #pull stats out to see what we did (how many old fields kept, how many dropped, and how many new ones we need this year
+                    tenuredstats = grass.parse_command('r.univar', flags = 'ge', map = tenuredfields)
+                    tenuredcells = int(float(tenuredstats['cells']) - float(tenuredstats['null_cells']))
+                    droppedcells = int(float(oldfieldstats['cells']) - float(oldfieldstats['null_cells'])) - tenuredcells
                     tempfields = tenuredfields
-                else:
-                    newcells = numfields-tenuredcells
+                    grass.message("Keeping %s fields in tenure list, dropping %s underperforming fields" % (tenuredcells, droppedcells))
+                else: #positive number, so add fields
+                    grass.mapcalc("${tenuredfields}=if(isnull(${oldfields}), null(), 1)", quiet = True, oldfields = oldfields, tenuredfields = tenuredfields) # copy last year's fields forward as tenured
+                    tenuredstats = grass.parse_command('r.univar', flags = 'ge', map = oldtenure)
+                    tenuredcells = int(float(tenuredstats['cells']) - float(tenuredstats['null_cells']))
                     #Now run r.random to get the required number of additional fields
                     tempfields1 = "%stemporary_extra_fields_map" % pid
                     grass.run_command('r.random', quiet = 'True', input = tempagcatch, npoints = newcells, raster = tempfields1)
                     #patch the new fields into the old fields
-                    grass.run_command('r.patch', quiet = "True", input = "%s,%s" % (tempfields1,tenuredfields), output = tempfields)
-                grass.message("Keeping %s fields in tenure list, dropping %s underperforming fields, adding %s new fields" % (tenuredcells, droppedcells,newcells))
-        elif use_flags['i'] is True:
+                    grass.run_command('r.patch', quiet = "True", input = "%s,%s" % (tempfields1,oldtenure), output = tempfields)
+                    grass.message("Keeping %s fields in tenure list, adding %s new fields" % (tenuredcells, newcells))
+        elif tenuretype == "Satisfice":
             grass.message("Land Tenure is ON, with SATSFICING strategy")
             #check for first year, and zero out tenure if so
             if (year + 1) == 1:
                 grass.run_command('r.random', quiet = 'True', input = agcatch, npoints = numfields, raster = tempfields)
-                grass.message('First year, so all farm fields randomly assigned')
-                tenuredcells = 0
+                grass.message('First year, so %s fields randomly assigned' % numfields)
+                tenuredcells = numfields
                 droppedcells = 0
                 newcells = 0
             else:
@@ -827,7 +902,7 @@ def main():
                 #make a map of the current potential yields from the old fields
                 grass.mapcalc("${tempcomparefields}=if(isnull(${oldfields}), null(), ${tempcerealreturn} )", quiet = "True", tempcomparefields = tempcomparefields, oldfields = oldfields, tempcerealreturn = tempcerealreturn)
                 #grab stats from the old fields
-                oldfarmstats = grass.parse_command('r.univar', flags = 'ge', map = tempcomparefields)
+                oldfieldstats = grass.parse_command('r.univar', flags = 'ge', map = tempcomparefields)
                 #make map of tenured fields for this year
                 grass.mapcalc("${tenuredfields}=if(isnull(${oldfields}), null(), 1)", quiet = "True", tenuredfields=tenuredfields, oldfields = oldfields)
                 #temporarily update the agricultural catchment by withholding tenured cells. All other cells in the catchment will be fair game to be chosen for the new fields.
@@ -836,19 +911,23 @@ def main():
                 tenuredstats = grass.parse_command('r.univar', flags = 'ge', map = tenuredfields)
                 tenuredcells = int(float(tenuredstats['cells']) - float(tenuredstats['null_cells']))
                 droppedcells = 0
-                if numfields-tenuredcells <= 0:
-                    newcells = 0
-                    tempfields = tenuredfields
-                else:
-                    newcells = numfields-tenuredcells
+                newcells = numfields-tenuredcells #find out the difference between what we have and what we need
+                if newcells <= 0: #negative number, so we need to drop some fields.
+                    #Now run r.random to randomly select fields to drop
+                    tempfields1 = "%stemporary_dropped_fields_map" % pid
+                    grass.run_command('r.random', quiet = 'True', input = tenuredfields, npoints = 1-newcells, raster = tempfields1)
+                    #Remove the new fields from the tenured fields map
+                    grass.mapcalc("${tempfields}=if(isnull(${tenuredfields}), null(), if(isnull(${tempfields1}), 1, null()))", quiet = "True", tempfields = tempfields, tempfields1 = tempfields1, tenuredfields = tenuredfields)
+                    grass.message("Dropping %s excess fields" % (1-newcells))
+                else: #positive number, so add fields
                     #Now run r.random to get the required number of additional fields
                     tempfields1 = "%stemporary_extra_fields_map" % pid
                     grass.run_command('r.random', quiet = 'True', input = tempagcatch, npoints = newcells, raster = tempfields1)
                     #patch the new fields into the old fields
                     grass.run_command('r.patch', quiet = "True", input = "%s,%s" % (tempfields1,tenuredfields), output = tempfields)
-                grass.message("Adding %s new fields" % (newcells))
+                    grass.message("Adding %s new fields" % (newcells))
         else:
-            grass.message("Land Teure is OFF")
+            grass.message("Land Tenure is OFF")
             tenuredcells = 0
             droppedcells = 0
             newcells = 0
@@ -867,9 +946,9 @@ def main():
         cerealdif = float(cerealstats['sum']) - float(cerealreq)
         numfarmcells = int(float(cerealstats['cells']) - float(cerealstats['null_cells']))
         areafarmed = numfarmcells * float(nsfieldsize) * float(ewfieldsize)
-        #update agent mempory with the farming surplus or deficit from this year
-        farmingmemory.append(cerealdif)
-        farmyieldmemory.append(float(cerealstats['mean']))
+        #update agent mempory with the farming surplus or deficit from this year, fuzzing up the means a bit to simulate the vagaries of memory. We do this by changing the actual values of these things by randomizing them through a gaussian probability filter with mu of the mean value and sigma of 0.0333. This means that the value they actually remember can be up to +- %10 of the actual mean value (eg. at the 3-sigma level of a gaussian distribution with sigma of 0.0333), although they have a better change of remembering values closer to the actual average. This more closely models how good people are at "educated guesses" of central tendencies (i.e., it's how people "guesstimate" the "average" value). This also ensures some variation from year to year, regardless of the "optimum" solution.
+        farmingmemory.append(random.gauss(float(cerealdif), (float(cerealdif) * 0.0333)))
+        farmyieldmemory.append(random.gauss(float(cerealstats["mean"]), (float(cerealstats['mean']) * 0.0333)))
          #find out the percentage of agcatch that was farmed this year.
         basepercent = 100 * (numfarmcells / (float(cerealstats2['cells']) - float(cerealstats2["null_cells"]) ) )
         if basepercent > 100:
@@ -925,13 +1004,13 @@ def main():
             grass.mapcalc("${tempgrazecatch}=if(isnull(${grazecatch}), null(), if(isnull(${fields}), ${tempgrazereturn}, null()))", quiet = "True", tempgrazecatch = tempgrazecatch, grazecatch = grazecatch, fields = fields, tempgrazereturn = tempgrazereturn)
         #Now that we know where we are allowed to graze, how much of the grazing catchment does the agent think it needs to meet its remaining fodder requirements? First grab some general stats from the grazing catchment.
         fodderstats = grass.parse_command('r.univar', flags = 'ge', percentile = '90', map = tempgrazecatch)
-        #"Fuzz up" the agent's memory of past yields and shortfalls. We do this by padding the actual values of these things to a randomly generated percentage that is drawn from a gaussian probability distribution with mu of the mean value and sigma of 0.0333. This means that the absolute max/min pad can only be up to +- %10 of the mean value (eg. at the 3-sigma level of a gaussian distribution with sigma of 0.0333), and that pad values closer to 0% will be more likely than pad values close to +- 10%. This more closely models how good people are at "educated guesses" of central tendencies (i.e., it's how people "guesstimate" the "average" value). This also ensures some variation from year to year, regardless of the "optimum" solution.
+        # Use the agent's memory of past grazing yields and deficits to determine what they think they need to do this year.
         if len(grazeyieldmemory) is 0: #if it's the first year, then just use the fuzzed average potential yield from all cells in agcatch, and make the padded amount 1
             fuzzygyieldmemory = random.gauss(float(fodderstats['mean']), (float(fodderstats['mean']) * 0.0333))
             fuzzygdeficitmemory = -1
         else:
-            fuzzygyieldmemory = random.gauss(numpy.mean(grazeyieldmemory[slicer:]), (numpy.mean(grazeyieldmemory[slicer:]) * 0.0333))
-            fuzzygdeficitmemory = random.gauss(numpy.mean(grazingmemory[slicer:]), (numpy.mean(grazingmemory[slicer:]) * 0.0333))
+            fuzzygyieldmemory = numpy.mean(grazeyieldmemory[slicer:])
+            fuzzygdeficitmemory = numpy.mean(grazingmemory[slicer:])
         #Figure out how many grazing patches the agent thinks it needs based on current average patch yield
         numfoddercells = int(round(float(remainingfodder) / fuzzygyieldmemory))
         grass.debug("total graze patches should be %s" % numfoddercells)
@@ -988,20 +1067,35 @@ def main():
             grazepercent = 100 * (numgrazecells / totgrazecells)
             fodderdif =  totalfodder - float(fodderreq)
             areagrazed = numgrazecells * (float(region['nsres']) * float(region['ewres']))
-        #update agent mempory with the grazing surplus or deficit from this year
-        grazingmemory.append(fodderdif)
-        grazeyieldmemory.append(float(grazestats['mean']))
+        # update agent mempory with the grazing surplus or deficit from this year, fuzzing up the means a bit to simulate the vagaries of memory. We do this by changing the actual values of these things by randomizing them through a gaussian probability filter with mu of the mean value and sigma of 0.0333. This means that the value they actually remember can be up to +- %10 of the actual mean value (eg. at the 3-sigma level of a gaussian distribution with sigma of 0.0333), although they have a better change of remembering values closer to the actual average. This more closely models how good people are at "educated guesses" of central tendencies (i.e., it's how people "guesstimate" the "average" value). This also ensures some variation from year to year, regardless of the "optimum" solution.
+        grazingmemory.append(random.gauss(float(fodderdif), (float(fodderdif) * 0.0333)))
+        grazeyieldmemory.append(random.gauss(float(grazestats['mean']), (float(grazestats['mean']) * 0.0333)))
         grass.message('We got %.2f kg of fodder from stubbles, and so we grazed %.2f percent of grazecatch this year.' % (float(stubblestats['sum']),grazepercent))
         #figure out how many animals and people were fed
         animfed = (totalfodder / indfodreq)
         peoplefed = ((float(cerealstats['sum']) / indcerreq) + (animfed / animals))
-        grass.message('We fed %i herd animals, and supported %i people this year...' %(animfed, peoplefed))
+        grass.message('We fed %i herd animals, and produced enough food to fully support %i people this year (current population: %i)...' %(animfed, peoplefed, numpeople))
+        # If the -p flag was checked, update population levels based on returns.
+        if use_flags['p'] is True:
+            if peoplefed / numpeople < starvthresh:     #Check if they starved this year and just die deaths if so
+                numpeople = numpeople - deathdealer(deathrate, numpeople)
+                grass.message("Starved a bit this year, no births will occur. New population: %i" % numpeople)
+            else: #otherwise, balance births and deaths, and adjust the population accordingly
+                numpeople = numpeople + babymaker(birthrate, numpeople) - deathdealer(deathrate, numpeople)
+                grass.message("Balancing births and deaths... New population: %i" % numpeople)
+            # Update labor and yeild needs
+            cereal_pers = numpeople * agratio
+            fodder_anim = animals * numpeople * pratio
+            cerealreq = indcerreq * cereal_pers
+            fodderreq = indfodreq * fodder_anim
+            totlabor = numpeople * aglabor
+            maxfields = int(round(totlabor / fieldlabor))
         #write the yield stats to the stats file
         grass.message('Writing some farming and grazing stats from this year....')
         f = open(textout3, 'a')
         if os.path.getsize(textout3) == 0:
-            f.write("Farming and Grazing Yields Stats\n\nVariables used in the model:\ncell resolution (grazing patch size),%s\nagcatch,%s\nnsfieldsize,%s\newfieldsize,%s\ngrazecatch,%s\ngrazespatial,%s\ngrazepatchy,%s\nmaxgrazeimpact,%s\nmanurerate,%s\ninlcov,%s\nyears,%s\nfarmval,%s\nmaxfert,%s\nmaxwheat,%s\nmaxbarley,%s\nagmix,%s\nagentmem,%s\nnumpeople,%s\nanimals,%s\ncalculated agricultural ratio,%s\ncalculated pastoral ratio,%s\ncalculated cereal required per person,%s\ncalculated fodder required per animal,%s\ncalculated total cereal required,%s\ncalculated total number of animals required,%s\ncalculated total fodder required,%s\n\nFarming stats in Kg wheat and/or barley seeds per farmplot.\nGrazing stats in Kg of digestable matter per grazing plot. Note that this may also include stubble grazing if enabled.\n\n,,Agricultural Yields,,,,,,,,,,,,,Grazing Yields,,,,,,,,,,,,,,,Additional Stats\nYear,People Fed,Percent of Agricultural Catchment Used,Number of Farm Fields,Number of Tenured Fields,Number of Dropped Fields,Number of New Fields,Total Farmed Area (m2),Per Field Harves Median,Per Field Harvest Mean,Per Field Harvest Standard Deviation,Total Cereals Harvested,Total Cereals Required,Cereal Surplus/Deficit,,Herd Animals Fed,Percent of Grazing Catchment Used,Total Grazed Area (m2),Wild Grazing Patch Median,Wild Grazing Patch Mean,Wild Grazing Patch Standard Deviation,Total Wild Fodder,Field Stubbles Median,Field Stubbles Mean,Field Stubbles Standard Deviation,Total Stubble Fodder,Total Fodder Consumed,Total Amount of Fodder Required,Fodder Surplus/Deficit,,,Minimum Cereals,First Quartile Cereals,Third Quartile Cereals,Maximum Cereals,,Minimum Wild Fodder,First Quartile Wild Fodder,Third Quartile Wild Fodder,Maximum Wild Fodder,,Minimum Stubble Fodder,Stubble Quartile Stubble Fodder,Third Quartile Stubble Fodder,Maximum Stubble Fodder" % (region['nsres'],agcatch,nsfieldsize,ewfieldsize,grazecatch,grazespatial,grazepatchy,maxgrazeimpact,manurerate,inlcov,years,farmval,maxfert,maxwheat,maxbarley,agmix,agentmem,numpeople,animals,agratio,pratio,indcerreq,fodder_anim,indfodreq,cerealreq,fodderreq))
-        f.write('\n%s' % now + ',' + str(peoplefed) + ',' + str(agpercent) + ',' + str(numfarmcells) + ',' + str(tenuredcells) + ',' + str(droppedcells) + ',' + str(newcells) + ',' + str(areafarmed) + ',' + cerealstats['median'] + ',' + cerealstats['mean'] + ',' + cerealstats['stddev'] + ',' + cerealstats['sum'] + ',' + str(cerealreq) + ',' + str(cerealdif) + ',,' + str(animfed) + ',' + str(grazepercent) + ',' + str(areagrazed) + ',' + grazestats['median'] + ',' + grazestats['mean'] + ',' + grazestats['stddev'] + ',' + grazestats['sum'] + ',' + stubblestats['median'] + ',' + stubblestats['mean'] + ',' + stubblestats['stddev'] + ',' + stubblestats['sum'] + ',' + str(totalfodder) + ',' + str(fodderreq) + ',' + str(fodderdif) + ',,,' + cerealstats['min'] + ',' + cerealstats['first_quartile'] + ',' + cerealstats['first_quartile'] + ',' + cerealstats['max'] + ',,' + grazestats['min'] + ',' + grazestats['first_quartile'] + ',' + grazestats['third_quartile'] + ',' + grazestats['max'] + ',,' + stubblestats['min'] + ',' + stubblestats['first_quartile'] + ',' + stubblestats['third_quartile'] + ',' + stubblestats['max'])
+            f.write("Year,Effective carrying capacity,Population,Percent of Agricultural Catchment Used,Number of Farm Fields,Number of Tenured Fields,Number of Dropped Fields,Number of New Fields,Total Farmed Area (m2),Agent Memory of Per Field Harvest Mean,Per Field Harvest Mean,Per Field Harvest Standard Deviation,Total Cereals Harvested,Total Cereals Required,Cereal Surplus/Deficit,Agent Memory of Cereal Surplus/Deficit,,Herd Animals Fed,Percent of Grazing Catchment Used,Total Grazed Area (m2),Agent Memory of Wild Grazing Patch Mean,Wild Grazing Patch Mean,Wild Grazing Patch Standard Deviation,Total Wild Fodder,Field Stubbles Mean,Field Stubbles Standard Deviation,Total Stubble Fodder,Total Fodder Consumed,Total Amount of Fodder Required,Fodder Surplus/Deficit,,,Minimum Cereals,First Quartile Cereals,Third Quartile Cereals,Maximum Cereals,,Minimum Wild Fodder,First Quartile Wild Fodder,Third Quartile Wild Fodder,Maximum Wild Fodder,,Minimum Stubble Fodder,Stubble Quartile Stubble Fodder,Third Quartile Stubble Fodder,Maximum Stubble Fodder") # the file is empty, so write the headers on the first line.
+        f.write('\n%s' % now + ',' + str(peoplefed) + ',' + str(numpeople) + ',' + str(agpercent) + ',' + str(numfarmcells) + ',' + str(tenuredcells) + ',' + str(droppedcells) + ',' + str(newcells) + ',' + str(areafarmed) + ',' + str(fuzzyyieldmemory) + ',' + cerealstats['mean'] + ',' + cerealstats['stddev'] + ',' + cerealstats['sum'] + ',' + str(cerealreq) + ',' + str(cerealdif) + ',' + str(fuzzydeficitmemory) + ',,' + str(animfed) + ',' + str(grazepercent) + ',' + str(areagrazed) + ',' + str(fuzzygyieldmemory) + ',' + grazestats['mean'] + ',' + grazestats['stddev'] + ',' + grazestats['sum'] + ',' + stubblestats['mean'] + ',' + stubblestats['stddev'] + ',' + stubblestats['sum'] + ',' + str(totalfodder) + ',' + str(fodderreq) + ',' + str(fodderdif) + ',,,' + cerealstats['min'] + ',' + cerealstats['first_quartile'] + ',' + cerealstats['first_quartile'] + ',' + cerealstats['max'] + ',,' + grazestats['min'] + ',' + grazestats['first_quartile'] + ',' + grazestats['third_quartile'] + ',' + grazestats['max'] + ',,' + stubblestats['min'] + ',' + stubblestats['first_quartile'] + ',' + stubblestats['third_quartile'] + ',' + stubblestats['max']) # update this year's row with the data from this year's simulation
         #UPDATE LANDCOVER AND SOIL FERTILITY
         grass.message('Updating landcover and soil fertility with new impacts')
         #update fertility
@@ -1087,7 +1181,7 @@ def main():
         else:
             inelev = "%s_Year_%s_Elevation_Map" % (prfx, then)
         try:
-            grass.run_command('r.landscape.evol7.py', quiet = "True", number = 1, prefx = prefix, c = outcfact, elev = inelev, initbdrk = initbdrk, outdem = "Elevation_Map", outsoil = "Soil_Depth_Map", r = r, k = k, sdensity = sdensity, kappa = kappa, manningn = manningn, flowcontrib = outxs, cutoff1 = cutoff1, cutoff2 = cutoff2, cutoff3 = cutoff3, rain = rain, storms = storms, stormlength = stormlength, speed = speed, kt = kt, loadexp = loadexp, smoothing = smoothing, statsout = statsout, flags = ''.join(levol_flags))
+            grass.run_command('r.landscape.evol', quiet = "True", number = 1, prefx = prefix, c = outcfact, elev = inelev, initbdrk = initbdrk, outdem = "Elevation_Map", outsoil = "Soil_Depth_Map", r = r, k = k, sdensity = sdensity, kappa = kappa, manningn = manningn, flowcontrib = outxs, cutoff1 = cutoff1, cutoff2 = cutoff2, cutoff3 = cutoff3, rain = rain, storms = storms, stormlength = stormlength, speed = speed, kt = kt, loadexp = loadexp, smoothing = smoothing, statsout = statsout, flags = ''.join(levol_flags))
         except:
             grass.fatal("Something is wrong with the values you sent to r.landscape.evol. Did you forget something? Check the values and try again...\nSimulation terminated with an error at time step %s" % now)
             sys.exit(1)
