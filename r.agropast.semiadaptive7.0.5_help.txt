@@ -1,0 +1,283 @@
+GRASS GIS manual: r.agropast.semiadaptive7.0.5
+
+DESCRIPTION
+
+r.agropast.semiadaptive7.0.5  - Simulates agricultural and pastoral landuse and tracks yields and environmental impacts. Basic farming and grazing strategies and yield goals are predetermined by the researcher, and do not change (adapt) during the simulation, but it is possible for population to change based on returns. This version implments a land tenuring alogrithm. Requires r.landscape.evol. Note that some stats files will be written to current mapset, and will be appended to if you run the simulation again with the same prefix.
+
+USAGE
+
+r.agropast.semiadaptive7.0.5 [-pfgc1kdrste] years=integer prfx=string  [numpeople=float]   [birthrate=float]   [deathrate=float]   [starvthresh=float]   [agentmem=integer]   [aglabor=float]   [cerealreq=float]   [animals=float]   [fodderreq=float]   [a_p_ratio=float]   [costsurf=string]   [agcatch=string]   [agmix=float]   [nsfieldsize=float]   [ewfieldsize=float]   [fieldlabor=float]   [farmval=float]   [farmimpact=float[,<i>float</i>,...]]   [maxwheat=float]   [maxbarley=float]   [tenuretype=string]   [tenuredrop=float]   [grazecatch=string]   [mingraze=float]   [grazespatial=float]   [grazepatchy=float]   [maxgrazeimpact=integer]   [manurerate=float]   [fodder_rules=string]   [fertilrate=float[,<i>float</i>,...]]   [inlcov=string]   [infert=string]   [maxlcov=string]   [maxfert=string]   [lc_rules=string]   [cfact_rules=string]   [elev=string]   [initbdrk=string]   [k=float]   [sdensity=float]   [kt=float]   [loadexp=float]   [manningn=string]   [kappa=float]   [rain=string]   [r=string]   [storms=string]   [stormlength=string]   [speed=float]   [cutoff1=float]   [cutoff2=float]   [cutoff3=float]   [smoothing=string]   [--help]  [--verbose]  [--quiet]  [--ui] 
+
+
+FLAGS:
+
+-p
+-p Allow the population to vary over time, according to subsistence returns
+
+-f
+-f Do not graze in unused portions of the agricultural catchment (i.e., do not graze on "fallowed" fields, and thus no "manuring" of those fields will occur)
+
+-g
+-g Do not allow "stubble grazing" on harvested fields (and thus no "manuring" of fields)
+
+-c
+-c Keep C-factor (and rainfall excess) maps for each year
+
+-1
+-1 Calculate streams as 1D difference instead of 2D divergence
+
+-k
+-k Keep ALL temporary maps (overides flags -drst). This will make A LOT of maps!
+
+-d
+-d Don't output yearly soil depth maps
+
+-r
+-r Don't output yearly maps of the erosion/deposition rates ("ED_rate" map, in vertical meters)
+
+-s
+-s Keep all slope maps
+
+-t
+-t Keep yearly maps of the Transport Capacity at each cell ("Qs" maps)
+
+-e
+-e Keep yearly maps of the Excess Transport Capacity (divergence) at each cell ("DeltaQs" maps)
+
+--help
+Print usage summary
+
+--verbose
+Verbose module output
+
+--quiet
+Quiet module output
+
+--ui
+Force launching GUI dialog
+
+
+
+PARAMETERS:
+
+years=integer[required]
+Number of iterations ("years") to run
+Default: 200
+
+prfx=string[required]
+Prefix for all output maps
+Default: sim
+
+numpeople=float
+Number of people in the village(s) (starting population size with flag -p, otherwise stays constant throughout the simulation)
+Default: 120
+
+birthrate=float
+Per-capita human fecundity (only active with flag -p)
+Default: 0.054
+
+deathrate=float
+Per-capita human mortality hazard (only active with flag -p)
+Default: 0.04
+
+starvthresh=float
+Starvation threshold. If returns are below this percentage of the normal subsistence needs, people bcome "resource-starved." No births will occur, but deaths will still happen. (only active with flag -p)
+Default: 0.6
+
+agentmem=integer
+Length of the "memory" of the agent in years. The agent will use the mean surplus/defict information from this many of the most recent previous years when making a subsistence plan for the current year.
+Default: 5
+
+aglabor=float
+The amount of agricultural labor an average person of the village can do in a year (in "person-days")
+Default: 300
+
+cerealreq=float
+Amount of cereals that would be required per person per year if cereals were the ONLY food item (Kg)
+Default: 370
+
+animals=float
+Number of herd animals that would be needed per person per year if pastoral products were the ONLY food item
+Default: 60
+
+fodderreq=float
+Amount of fodder required per herd animal per year (Kg)
+Default: 680
+
+a_p_ratio=float
+Actual ratio of agricultural to pastoral foods in the diet (0-1, where 0 = 100% agricultural and 1 = 100% pastoral)
+Options: 0.0-1.0
+Default: 0.20
+
+costsurf=string
+Map of movement costs from the center of the agricultural/grazing catchments (from r.walk or r.cost).
+
+agcatch=string
+Map of the largest possible agricultural catchment map (From r.catchment or r.buffer, where catchment is a single integer value, and all else is NULL)
+
+agmix=float
+The wheat/barley ratio (e.g., 0.0 for all wheat, 1.0 for all barley, 0.5 for an equal mix)
+Options: 0.0-1.0
+Default: 0.25
+
+nsfieldsize=float
+North-South dimension of fields in map units (Large field sizes may lead to some overshoot of catchment boundaries)
+Default: 20
+
+ewfieldsize=float
+East-West dimension of fields in map units (Large field sizes may lead to some overshoot of catchment boundaries)
+Default: 50
+
+fieldlabor=float
+Number of person-days required to till, sow, weed, and harvest one farm field in a year.
+Default: 50
+
+farmval=float
+The landcover value for farmed fields (Should correspond to an appropriate value from your landcover rules file.)
+Default: 5
+
+farmimpact=float[,float,...]
+The mean and standard deviation of the amount to which farming a patch decreases its fertility (in percentage points of maximum fertility, entered as: "mean,std_dev"). Fertility impact values of indvidual farm plots will be randomly chosen from a gaussian distribution that has this mean and std_dev.
+Default: 3,2
+
+maxwheat=float
+Maximum amount of wheat that can be grown (kg/ha)
+Default: 1750
+
+maxbarley=float
+Maximum amount of barley that can be grown (kg/ha)
+Default: 1250
+
+tenuretype=string
+Choose the land tenuring strategy: "None" (Fields are chosen at random each year), "Satisficing" (First year's fields are chosen at random. Fields are tenured, but some may be randomly dropped or added to meet the minimum need), "Maximizing" (Same as "satisficing", but tenured fields are only dropped if production falls below the threshold defined by "tenuredrop," not according to minimum need.)
+Options: None, Maximize, Satisfice
+Default: Maximize
+
+tenuredrop=float
+Threshold for dropping land out of tenure (with tenuretype as "Maximize"). If the value is 0, fields that yield less than the mean of all fields are dropped. If the value is greater than 0, then fields that are lower than that percentage of the maximum yield of all fields will be dropped.
+Options: 0.0-1.0
+Default: 0.1
+
+grazecatch=string
+Map of the largest possible grazing catchment (From r.catchment or r.buffer, where catchment is a single integer value, and all else is NULL).
+
+mingraze=float
+Minimum amount of vegetation on a cell for it to be considered grazeable (in value of succession stages, matching landcover rules file)
+Default: 2
+
+grazespatial=float
+Spatial dependency of the grazing pattern in map units. This value determines how "clumped" grazing patches will be. A value close to 0 will produce a perfectly randomized grazing pattern with patch size=resolution, and larger values will produce increasingly clumped grazing patterns, with the size of the patches corresponding to the value of grazespatial (in map units).
+Default: 50
+
+grazepatchy=float
+Coefficient that determines the patchiness of the grazing catchemnt. Value must be non-zero, and usually will be &lt;= 1.0. Values close to 0 will create a patchy grazing pattern, values close to 1 will create a "smooth" grazing pattern. Actual grazing patches will be sized to the resolution of the input landcover map.
+Default: 1.0
+
+maxgrazeimpact=integer
+Maximum impact of grazing in units of "landcover.succession". Grazing impact values of individual patches will be chosen from a gaussian distribution between 1 and this maximum value (i.e., most values will be between 1 and this max). Value must be &gt;= 1.
+Default: 3
+
+manurerate=float
+Base rate that animal dung contributes to fertility increase on a grazed patch in units of percentage of maximum fertility regained per increment of grazing impact. Actual fertility regain values are thus calculated as "manure_rate x grazing_impact", so be aware that this variable interacts with the grazing impact settings you have chosen.
+Options: 0.0-100.0
+Default: 0.03
+
+fodder_rules=string
+Path to foddering rules file for calculation of fodder gained by grazing
+Default: /home/iullah/Dropbox/Scripts_Working_Dir/rules/fodder_rules.txt
+
+fertilrate=float[,float,...]
+Comma separated list of the mean and standard deviation of the natural fertility recovery rate (percentage by which soil fertility increases per year if not farmed, entered as: "mean,stdev".) Fertility recovery values of individual landscape patches will be randomly chosen from a gaussian distribution that has this mean and std_dev.
+Default: 2,0.5
+
+inlcov=string
+Input landcover map (Coded according to landcover rules file below)
+
+infert=string
+Input fertility map (Coded according to percentage retained fertility, with 100 being full fertility)
+
+maxlcov=string
+Maximum value of landcover for the landscape (Can be a single numerical value or a cover map of different maximum values. Shouldn't exceed maximum value in rules file')
+Default: 50
+
+maxfert=string
+Maximum value of fertility for the landscape (Can be a single numerical value or a cover map of different maximum values. Shouldn't exceed 100)
+Default: 100
+
+lc_rules=string
+Path to reclass rules file for landcover map
+Default: /home/iullah/Dropbox/Scripts_Working_Dir/rules/luse_reclass_rules.txt
+
+cfact_rules=string
+Path to recode rules file for c-factor map
+Default: /home/iullah/Dropbox/Scripts_Working_Dir/rules/cfactor_recode_rules.txt
+
+elev=string
+Input elevation map (DEM of surface)
+
+initbdrk=string
+Bedrock elevations map (DEM of bedrock)
+Default: 
+
+k=float
+Soil erodability index (K factor) map or constant
+Default: 0.42
+
+sdensity=float
+Soil density map or constant [T/m3] for conversion from mass to volume
+Default: 1.2184
+
+kt=float
+Stream transport efficiency variable (0.001 for a soft substrate, 0.0001 for a normal substrate, 0.00001 for a hard substrate, 0.000001 for a very hard substrate)
+Options: 0.001, 0.0001, 0.00001, 0.000001
+Default: 0.0001
+
+loadexp=float
+Stream transport type variable (1.5 for mainly bedload transport, 2.5 for mainly suspended load transport)
+Options: 1.5, 2.5
+Default: 1.5
+
+manningn=string
+Map or constant of the value of Manning's "N" value for channelized flow.
+Default: 0.05
+
+kappa=float
+Hillslope diffusion (Kappa) rate map or constant [m/kyr]
+Default: 1
+
+rain=string
+Precip totals for the average storm [mm] (or path to climate file of comma separated values of "rain,R,storms,stormlength", with a new line for each year of the simulation)
+Default: 20.61
+
+r=string
+Rainfall (R factor) constant (AVERAGE FOR WHOLE MAP AREA) (or path to climate file of comma separated values of "rain,R,storms,stormlength", with a new line for each year of the simulation)
+Default: 4.54
+
+storms=string
+Number of storms per year (integer) (or path to climate file of comma separated values of "rain,R,storms,stormlength", with a new line for each year of the simulation)
+Default: 25
+
+stormlength=string
+Average length of the storm [h] (or path to climate file of comma separated values of "rain,R,storms,stormlength", with a new line for each year of the simulation)
+Default: 24.0
+
+speed=float
+Average velocity of flowing water in the drainage [m/s]
+Default: 1.4
+
+cutoff1=float
+Flow accumulation breakpoint value for shift from diffusion to overland flow
+Default: 0
+
+cutoff2=float
+Flow accumulation breakpoint value for shift from overland flow to rill/gully flow (if value is the same as cutoff1, no sheetwash procesess will be modeled)
+Default: 100
+
+cutoff3=float
+Flow accumulation breakpoint value for shift from rill/gully flow to stream flow (if value is the same as cutoff2, no rill procesess will be modeled)
+Default: 100
+
+smoothing=string
+Amount of additional smoothing (answer "no" unless you notice large spikes in the erdep rate map)
+Options: no, low, high
+Default: no
