@@ -1,0 +1,11 @@
+version: "3"
+services:
+  grass:
+    build: 
+      context: .
+    volumes: 
+      - .:/shared
+    ports:
+      - "127.0.0.1:6080:6080"
+    environment:
+      PASSWORD: medland
