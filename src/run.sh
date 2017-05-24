@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+YEARS=${1:-2}
+
 # Set environment variables for GRASS
 export GISRC=/home/ubuntu/.grass7/rc
 export GISBASE=/usr/lib/grass72
@@ -22,4 +24,4 @@ else
 fi
 
 # Run the simulation on the Penaguila location
-python r.agropast.semiadaptive.py years=200 prfx=sim costsurf=farm_catch_10yr_30ppl_cost_surface@PERMANENT agcatch=farm_catch_10yr_30ppl@PERMANENT grazecatch=graze_catch@PERMANENT fodder_rules=/home/ubuntu/grassdata/Penaguila/rules/fodder_rules.txt inlcov=init_veg@PERMANENT infert=init_fert@PERMANENT lc_rules=/home/ubuntu/grassdata/Penaguila/rules/luse_reclass_rules.txt cfact_rules=/home/ubuntu/grassdata/Penaguila/rules/cfactor_recode_rules.txt elev=filledDEM@PERMANENT initbdrk=init_bdrk@PERMANENT --overwrite
+python r.agropast.semiadaptive.py years=$YEARS prfx=sim costsurf=farm_catch_10yr_30ppl_cost_surface@PERMANENT agcatch=farm_catch_10yr_30ppl@PERMANENT grazecatch=graze_catch@PERMANENT fodder_rules=/home/ubuntu/grassdata/Penaguila/rules/fodder_rules.txt inlcov=init_veg@PERMANENT infert=init_fert@PERMANENT lc_rules=/home/ubuntu/grassdata/Penaguila/rules/luse_reclass_rules.txt cfact_rules=/home/ubuntu/grassdata/Penaguila/rules/cfactor_recode_rules.txt elev=filledDEM@PERMANENT initbdrk=init_bdrk@PERMANENT --overwrite
