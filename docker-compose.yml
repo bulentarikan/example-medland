@@ -4,8 +4,9 @@ services:
     build: 
       context: .
     volumes: 
+      - ./downloads:/home/ubuntu/downloads
       - ./src:/shared
-      - ./Penaguila:/home/ubuntu/grassdata/Penaguila
+      - ./grassdata:/home/ubuntu/grassdata
     ports:
       - "127.0.0.1:6080:6080"
     environment:
