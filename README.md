@@ -12,5 +12,3 @@
 % docker-compose up -d
 % docker-compose exec --user=ubuntu grass bash run.sh
 ```
-
-Currently generates an unexpected parenthesis syntax error related to running `r.mapcalc`, see [issue #1](https://github.com/comses/example-medland/issues/1)
