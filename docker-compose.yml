@@ -4,7 +4,8 @@ services:
     build: 
       context: .
     volumes: 
-      - .:/shared
+      - ./src:/shared
+      - ./Penaguila:/home/ubuntu/grassdata/Penaguila
     ports:
       - "127.0.0.1:6080:6080"
     environment:
